@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">ديون</string>
+    <string name="notification_channel_name">تنبيهات مواعيد السداد</string>
+    <string name="notification_channel_desc">إشعارات تذكيرية بمواعيد استحقاق الديون والمستحقات المالية</string>
+    <string name="sign_in_with_google">تسجيل الدخول عبر Google</string>
+    <string name="nav_debts">دفتر الديون</string>
+    <string name="nav_statistics">الإحصائيات</string>
+    <string name="nav_reminders">التنبيهات</string>
+    <string name="nav_account">المزيد</string>
+    <string name="add_debt">إضافة دين</string>
+</resources>

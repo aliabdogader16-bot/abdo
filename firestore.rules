@@ -1,0 +1,121 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidDebt(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.personName is string && data.personName.size() >= 1 && data.personName.size() <= 80 &&
+             (!('personPhone' in data) || (data.personPhone is string && data.personPhone.size() <= 30)) &&
+             data.direction is string && (data.direction == 'receivable' || data.direction == 'payable') &&
+             data.currency is string && data.currency.size() >= 1 && data.currency.size() <= 10 &&
+             data.originalAmount is number && data.originalAmount > 0 && data.originalAmount <= 1000000000 &&
+             data.remainingAmount is number && data.remainingAmount >= 0 && data.remainingAmount <= 1000000000 &&
+             data.status is string && (
+               (data.status == 'settled' && data.remainingAmount == 0) ||
+               (data.status == 'active' && data.remainingAmount > 0)
+             ) &&
+             data.dueDateMillis is int && data.dueDateMillis >= 0 &&
+             data.reminderEnabled is bool &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 500)) &&
+             data.verificationCode is string && data.verificationCode.size() >= 3 && data.verificationCode.size() <= 40 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidTransaction(data, userId, debtId) {
+      return data.userId is string && data.userId == userId &&
+             data.debtId is string && data.debtId == debtId &&
+             data.type is string && (data.type == 'initial' || data.type == 'payment' || data.type == 'addition') &&
+             data.amount is number && data.amount > 0 && data.amount <= 1000000000 &&
+             data.balanceAfter is number && data.balanceAfter >= 0 && data.balanceAfter <= 1000000000 &&
+             (!('note' in data) || (data.note is string && data.note.size() <= 300)) &&
+             data.referenceCode is string && data.referenceCode.size() >= 3 && data.referenceCode.size() <= 40 &&
+             data.performedAtMillis is int && data.performedAtMillis > 0 &&
+             data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    match /users/{userId}/debts/{debtId} {
+      allow get: if isOwner(userId) && isValidId(debtId);
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(debtId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'personName', 'direction', 'currency',
+                         'originalAmount', 'remainingAmount', 'status',
+                         'dueDateMillis', 'reminderEnabled', 'verificationCode',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'personName', 'personPhone', 'direction', 'currency',
+                         'originalAmount', 'remainingAmount', 'status',
+                         'dueDateMillis', 'reminderEnabled', 'notes', 'verificationCode',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidDebt(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(debtId) &&
+                       isValidDebt(incoming(), userId) &&
+                       existing().status == 'active' &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().direction == existing().direction &&
+                       incoming().currency == existing().currency &&
+                       incoming().verificationCode == existing().verificationCode &&
+                       (
+                         incoming().diff(existing()).affectedKeys().hasOnly(['remainingAmount', 'originalAmount', 'status', 'updatedAt']) ||
+                         incoming().diff(existing()).affectedKeys().hasOnly(['personName', 'personPhone', 'dueDateMillis', 'reminderEnabled', 'notes', 'updatedAt'])
+                       );
+
+      allow delete: if isOwner(userId) && isValidId(debtId);
+
+      match /transactions/{transactionId} {
+        allow get: if isOwner(userId) && isValidId(debtId) && isValidId(transactionId);
+        allow list: if isOwner(userId) && isValidId(debtId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(debtId) &&
+                         isValidId(transactionId) &&
+                         isValidTransaction(incoming(), userId, debtId) &&
+                         incoming().keys().hasAll([
+                           'userId', 'debtId', 'type', 'amount',
+                           'balanceAfter', 'referenceCode', 'performedAtMillis', 'createdAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'debtId', 'type', 'amount',
+                           'balanceAfter', 'note', 'referenceCode', 'performedAtMillis', 'createdAt'
+                         ]) &&
+                         existsAfter(/databases/$(database)/documents/users/$(userId)/debts/$(debtId));
+
+        // Immutable documented financial audit trail
+        allow update: if false;
+        allow delete: if isOwner(userId) && isValidId(debtId) && isValidId(transactionId);
+      }
+    }
+  }
+}

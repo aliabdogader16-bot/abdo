@@ -1,0 +1,154 @@
+{
+  "entities": {
+    "Debt": {
+      "title": "Debt",
+      "description": "A tracked debt or financial due between the authenticated user and another individual.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated owner UID"
+        },
+        "personName": {
+          "type": "string",
+          "description": "Counterparty full or display name"
+        },
+        "personPhone": {
+          "type": "string",
+          "description": "Optional phone number for reminder messages"
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["receivable", "payable"],
+          "description": "receivable = owed to user; payable = user owes counterparty"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency code such as SAR, EGP, AED, USD, KWD, JOD"
+        },
+        "originalAmount": {
+          "type": "number",
+          "description": "Total principal amount"
+        },
+        "remainingAmount": {
+          "type": "number",
+          "description": "Current unpaid balance"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "settled"],
+          "description": "Current settlement state"
+        },
+        "dueDateMillis": {
+          "type": "integer",
+          "description": "Due date epoch milliseconds (0 if unset)"
+        },
+        "reminderEnabled": {
+          "type": "boolean",
+          "description": "Whether payment due reminder notifications are enabled"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional reason or repayment terms"
+        },
+        "verificationCode": {
+          "type": "string",
+          "description": "Unique reference code for documented receipts"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp written via FieldValue.serverTimestamp()"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp written via FieldValue.serverTimestamp()"
+        }
+      },
+      "required": [
+        "userId",
+        "personName",
+        "direction",
+        "currency",
+        "originalAmount",
+        "remainingAmount",
+        "status",
+        "dueDateMillis",
+        "reminderEnabled",
+        "verificationCode",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "DebtTransaction": {
+      "title": "DebtTransaction",
+      "description": "Immutable append-only financial operation log documenting debt creation, payments, and additions.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated owner UID"
+        },
+        "debtId": {
+          "type": "string",
+          "description": "Parent debt document ID"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["initial", "payment", "addition"],
+          "description": "Operation type"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Operation amount"
+        },
+        "balanceAfter": {
+          "type": "number",
+          "description": "Remaining balance after operation"
+        },
+        "note": {
+          "type": "string",
+          "description": "Optional operation note"
+        },
+        "referenceCode": {
+          "type": "string",
+          "description": "Unique documented operation code"
+        },
+        "performedAtMillis": {
+          "type": "integer",
+          "description": "Operation timestamp in epoch milliseconds"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp written via FieldValue.serverTimestamp()"
+        }
+      },
+      "required": [
+        "userId",
+        "debtId",
+        "type",
+        "amount",
+        "balanceAfter",
+        "referenceCode",
+        "performedAtMillis",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/debts/{debtId}": {
+      "schema": {
+        "$ref": "#/entities/Debt"
+      },
+      "description": "User-scoped debt and financial due records."
+    },
+    "/users/{userId}/debts/{debtId}/transactions/{transactionId}": {
+      "schema": {
+        "$ref": "#/entities/DebtTransaction"
+      },
+      "description": "Immutable financial transaction audit trail for a debt."
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "ديون",
+  "description": "تطبيق لمتابعة الديون والمستحقات المالية بين الأفراد مع تنبيهات بمواعيد السداد وتوثيق العمليات المالية.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
